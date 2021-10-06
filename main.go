@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"math/big"
 	"os"
 	"strings"
 
@@ -14,6 +15,16 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/pradeep-selva/uniswap-monitor/UniswapUSDC2Pool"
 )
+
+type SwapEvent struct {
+	Sender       common.Address
+	Recipient    common.Address
+	Amount0      *big.Int
+	Amount1      *big.Int
+	SqrtPriceX96 *big.Int
+	Liquidity    *big.Int
+	Tick         *big.Int
+}
 
 func GetEnvVar(key string) string {
 	return os.Getenv(key)
@@ -51,24 +62,16 @@ func main() {
 
 	for {
 		select {
-			case err := <-sub.Err():
-				log.Fatal(err)
-			case vLog := <-logs:
-				// event := struct {
-				// 	Sender [32]byte
-				// 	Recipient [32]byte
-				// 	Amount0 [32]byte
-				// 	Amount1 [32]byte
-				// 	SqrtPriceX96 [32]byte
-				// 	Liquidity [32]byte
-				// 	Tick [32]byte
-				// }{}
+		case err := <-sub.Err():
+			log.Fatal(err)
+		case vLog := <-logs:
+			var event SwapEvent
+			err = uniswapAbi.UnpackIntoInterface(&event, "Swap", vLog.Data)
+			checkError(err)
 
-				log.Println("--------- NEW SWAP ---------")
-				swapEvent, err := uniswapAbi.Unpack("Swap", vLog.Data)
-				checkError(err)
-
-				log.Println(swapEvent...)
+			log.Println("--------- NEW SWAP ---------")
+			log.Printf("Amount 0: %d || Amount 1: %d", event.Amount0, event.Amount1)
+			log.Printf("From: %s || To: %s", event.Sender.Hex(), event.Recipient.Hex())
 		}
 	}
 }
